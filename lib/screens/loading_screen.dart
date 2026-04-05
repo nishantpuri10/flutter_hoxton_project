@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -246,10 +247,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
       return const SizedBox(
         width: 24,
         height: 24,
-        child: CircularProgressIndicator(
-          strokeWidth: 2.5,
-          color: AppColors.white,
-        ),
+        child: _SpokeSpinner(),
       );
     }
 
@@ -306,4 +304,82 @@ class _LoadingScreenState extends State<LoadingScreen> {
       ],
     );
   }
+}
+
+// ── Spoke-style spinner ────────────────────────────────────────────────────
+class _SpokeSpinner extends StatefulWidget {
+  const _SpokeSpinner();
+
+  @override
+  State<_SpokeSpinner> createState() => _SpokeSpinnerState();
+}
+
+class _SpokeSpinnerState extends State<_SpokeSpinner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) => CustomPaint(
+        painter: _SpokePainter(_ctrl.value),
+      ),
+    );
+  }
+}
+
+class _SpokePainter extends CustomPainter {
+  final double progress;
+
+  const _SpokePainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const spokes = 8;
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final outerR = size.width / 2;
+    final innerR = outerR * 0.42;
+    final strokeW = size.width * 0.13;
+
+    final activeSpoke = (progress * spokes).floor() % spokes;
+
+    final paint = Paint()
+      ..strokeWidth = strokeW
+      ..strokeCap = StrokeCap.round;
+
+    for (int i = 0; i < spokes; i++) {
+      final angle = (i / spokes) * 2 * math.pi - math.pi / 2;
+      final behind = (activeSpoke - i + spokes) % spokes;
+      final opacity = (1.0 - (behind / spokes) * 0.85).clamp(0.15, 1.0);
+
+      paint.color = Colors.white.withValues(alpha: opacity);
+
+      final sx = cx + innerR * math.cos(angle);
+      final sy = cy + innerR * math.sin(angle);
+      final ex = cx + outerR * math.cos(angle);
+      final ey = cy + outerR * math.sin(angle);
+
+      canvas.drawLine(Offset(sx, sy), Offset(ex, ey), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SpokePainter old) => old.progress != progress;
 }

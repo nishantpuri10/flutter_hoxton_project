@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_colors.dart';
 import 'email_screen.dart';
 
@@ -300,23 +301,41 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   // ── Feature list ──────────────────────────────────────────────────────
+  // null = keep Material icon (Free, Intuitive row)
   static const _features = [
-    (Icons.pie_chart_outline_rounded, 'Organize Your Finances in One Place'),
-    (Icons.language_rounded, 'Track Your Financial Performance'),
-    (Icons.headset_mic_outlined, 'Free, Intuitive, and Backed by\nFinancial Experts'),
-    (Icons.send_rounded, 'Plan Your Financial Future'),
-    (Icons.verified_user_outlined, 'Security You Can Trust'),
+    (
+      'assets/images/organizeyourfinance.svg',
+      'Organize Your Finances in One Place',
+    ),
+    (
+      'assets/images/financialperformance.svg',
+      'Track Your Financial Performance',
+    ),
+    (
+      null, // keep headset icon
+      'Free, Intuitive, and Backed by\nFinancial Experts',
+    ),
+    (
+      'assets/images/financialFuture.svg',
+      'Plan Your Financial Future',
+    ),
+    (
+      'assets/images/security.svg',
+      'Security You Can Trust',
+    ),
   ];
 
   Widget _buildFeatures() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: List.generate(_features.length, (i) {
-        // Stagger: each item starts 0.16 apart
         final start = i * 0.16;
         final end = (start + 0.35).clamp(0.0, 1.0);
         final itemOpacity =
             ((_featuresCtrl.value - start) / (end - start)).clamp(0.0, 1.0);
+
+        final svgPath = _features[i].$1;
+        final label = _features[i].$2;
 
         return Opacity(
           opacity: itemOpacity,
@@ -328,20 +347,30 @@ class _SplashScreenState extends State<SplashScreen>
                 Container(
                   width: 48,
                   height: 48,
-                  decoration: BoxDecoration(
+                  padding: const EdgeInsets.all(11),
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF0F4040),
+                    color: Color(0xFF3C595B),
                   ),
-                  child: Icon(
-                    _features[i].$1,
-                    color: AppColors.accent,
-                    size: 22,
-                  ),
+                  child: svgPath != null
+                      ? SvgPicture.asset(
+                          svgPath,
+                          colorFilter: const ColorFilter.mode(
+                            Color(0xFFB8F4EF),
+                            BlendMode.srcIn,
+                          ),
+                          fit: BoxFit.contain,
+                        )
+                      : const Icon(
+                          Icons.headset_mic_outlined,
+                          color: Color(0xFFB8F4EF),
+                          size: 22,
+                        ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Text(
-                    _features[i].$2,
+                    label,
                     style: const TextStyle(
                       color: AppColors.white,
                       fontSize: 15,
