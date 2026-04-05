@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
+import 'home_screen.dart';
 
 enum _StepState { inactive, loading, done }
 
@@ -54,9 +55,18 @@ class _LoadingScreenState extends State<LoadingScreen> {
     if (!mounted) return;
     setState(() => _phase = _Phase.allDone);
 
-    // Phase 4: All done — hold then navigate
+    // Phase 4: All done — hold then navigate to home
     await Future.delayed(const Duration(milliseconds: 1500));
-    // TODO: navigate to home/dashboard screen
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const HomeScreen(),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 600),
+      ),
+      (route) => false,
+    );
   }
 
   String _getFirstName(String email) {
@@ -123,23 +133,52 @@ class _LoadingScreenState extends State<LoadingScreen> {
 
   Widget _buildTitle() {
     final isDone = _phase == _Phase.allDone;
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 500),
-      transitionBuilder: (child, anim) =>
-          FadeTransition(opacity: anim, child: child),
-      child: Text(
-        isDone
-            ? 'Your personalized\ndashboard is ready!'
-            : 'We are building your\ndashboard${'.' * _dotCount}',
-        key: ValueKey(isDone),
+
+    if (isDone) {
+      return const Text(
+        'Your personalized\ndashboard is ready!',
         textAlign: TextAlign.center,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.white,
           fontSize: 28,
           fontWeight: FontWeight.w700,
           height: 1.3,
         ),
-      ),
+      );
+    }
+
+    const style = TextStyle(
+      color: AppColors.white,
+      fontSize: 28,
+      fontWeight: FontWeight.w700,
+      height: 1.3,
+    );
+
+    // Dots in a fixed-width SizedBox so "dashboard" never shifts
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'We are building your',
+          textAlign: TextAlign.center,
+          style: style,
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            const Text('dashboard', style: style),
+            SizedBox(
+              width: 36, // wide enough for "..." — never shrinks
+              child: Text(
+                '.' * _dotCount,
+                style: style,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

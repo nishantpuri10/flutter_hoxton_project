@@ -35,7 +35,7 @@ class HoxtonApp extends StatelessWidget {
             primary: AppColors.accent,
             surface: AppColors.background,
           ),
-          fontFamily: 'SF Pro Display',
+          fontFamily: 'Sentient',
         ),
         home: const SplashScreen(),
       ),
