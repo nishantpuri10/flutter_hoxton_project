@@ -8,36 +8,29 @@ class AuthProvider extends ChangeNotifier {
 
   AuthStatus _status = AuthStatus.idle;
   String? _errorMessage;
-  bool _rememberMe = false;
+
+  // Two-step login flow
+  String _pendingEmail = '';
+
+  // Saved credentials (from secure storage)
   String _savedEmail = '';
   String _savedPassword = '';
 
   AuthStatus get status => _status;
   String? get errorMessage => _errorMessage;
-  bool get rememberMe => _rememberMe;
+  String get pendingEmail => _pendingEmail;
   String get savedEmail => _savedEmail;
   String get savedPassword => _savedPassword;
   bool get isLoading => _status == AuthStatus.loading;
 
-  Future<void> loadSavedCredentials() async {
-    final credentials = await _storageService.getSavedCredentials();
-    if (credentials['rememberMe'] == 'true') {
-      _rememberMe = true;
-      _savedEmail = credentials['email'] ?? '';
-      _savedPassword = credentials['password'] ?? '';
-      notifyListeners();
-    }
-  }
-
-  void setRememberMe(bool value) {
-    _rememberMe = value;
+  /// Called after email screen — stores email for use in password screen.
+  void setPendingEmail(String email) {
+    _pendingEmail = email;
     notifyListeners();
   }
 
-  Future<bool> login({
-    required String email,
-    required String password,
-  }) async {
+  /// Called after password screen — saves credentials and marks authenticated.
+  Future<bool> completeLogin({required String password}) async {
     _status = AuthStatus.loading;
     _errorMessage = null;
     notifyListeners();
@@ -45,31 +38,35 @@ class AuthProvider extends ChangeNotifier {
     // Simulate network call — replace with real API call
     await Future.delayed(const Duration(seconds: 2));
 
-    // Placeholder credential check
-    if (email.isNotEmpty && password.isNotEmpty) {
-      if (_rememberMe) {
-        await _storageService.saveCredentials(
-          email: email,
-          password: password,
-        );
-      } else {
-        await _storageService.clearCredentials();
-      }
+    if (_pendingEmail.isNotEmpty && password.isNotEmpty) {
+      await _storageService.saveCredentials(
+        email: _pendingEmail,
+        password: password,
+      );
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
     } else {
-      _errorMessage = 'Please enter valid credentials.';
+      _errorMessage = 'Something went wrong. Please try again.';
       _status = AuthStatus.error;
       notifyListeners();
       return false;
     }
   }
 
+  Future<void> loadSavedCredentials() async {
+    final credentials = await _storageService.getSavedCredentials();
+    if (credentials['rememberMe'] == 'true') {
+      _savedEmail = credentials['email'] ?? '';
+      _savedPassword = credentials['password'] ?? '';
+      notifyListeners();
+    }
+  }
+
   Future<void> logout() async {
     await _storageService.clearCredentials();
     _status = AuthStatus.idle;
-    _rememberMe = false;
+    _pendingEmail = '';
     _savedEmail = '';
     _savedPassword = '';
     notifyListeners();
