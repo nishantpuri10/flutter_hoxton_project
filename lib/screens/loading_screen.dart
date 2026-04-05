@@ -1,5 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
+
+enum _StepState { inactive, loading, done }
+
+enum _Phase {
+  settingProfile,   // ⟳ Profile | ○ Dashboard
+  profileDone,      // ✅ Profile | ○ Dashboard  — "It will only take a moment"
+  settingDashboard, // ✅ Profile | ⟳ Dashboard  — "You're nearly there..."
+  allDone,          // ✅ Profile | ✅ Dashboard  — "Your personalized dashboard is ready!"
+}
 
 class LoadingScreen extends StatefulWidget {
   const LoadingScreen({super.key});
@@ -8,58 +19,228 @@ class LoadingScreen extends StatefulWidget {
   State<LoadingScreen> createState() => _LoadingScreenState();
 }
 
-class _LoadingScreenState extends State<LoadingScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
+class _LoadingScreenState extends State<LoadingScreen> {
+  _Phase _phase = _Phase.settingProfile;
+  int _dotCount = 1;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-
-    _pulseAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
+    _runSequence();
+    _animateDots();
   }
 
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
+  void _animateDots() async {
+    while (mounted && _phase != _Phase.allDone) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted || _phase == _Phase.allDone) break;
+      setState(() => _dotCount = (_dotCount % 3) + 1);
+    }
+  }
+
+  Future<void> _runSequence() async {
+    // Phase 1: Setting Profile (spinner)
+    await Future.delayed(const Duration(milliseconds: 2200));
+    if (!mounted) return;
+    setState(() => _phase = _Phase.profileDone);
+
+    // Phase 2: Profile done — brief hold before dashboard starts
+    await Future.delayed(const Duration(milliseconds: 900));
+    if (!mounted) return;
+    setState(() => _phase = _Phase.settingDashboard);
+
+    // Phase 3: Setting Up Dashboard (spinner) — subtitle → "You're nearly there..."
+    await Future.delayed(const Duration(milliseconds: 2200));
+    if (!mounted) return;
+    setState(() => _phase = _Phase.allDone);
+
+    // Phase 4: All done — hold then navigate
+    await Future.delayed(const Duration(milliseconds: 1500));
+    // TODO: navigate to home/dashboard screen
+  }
+
+  String _getFirstName(String email) {
+    final username = email.split('@').first;
+    if (username.isEmpty) return '';
+    return username[0].toUpperCase() + username.substring(1);
   }
 
   @override
   Widget build(BuildContext context) {
+    final email = context.read<AuthProvider>().pendingEmail;
+    final firstName = _getFirstName(email);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
           _buildDecorativeCorners(),
           Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Pulsing logo
-                ScaleTransition(
-                  scale: _pulseAnimation,
-                  child: Image.asset(
-                    'assets/images/image.png',
-                    width: 48,
-                    height: 48,
-                    fit: BoxFit.contain,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildTitle(),
+                  const SizedBox(height: 12),
+                  _buildSubtitle(firstName),
+                  const SizedBox(height: 36),
+                  _buildStep(
+                    label: _phase == _Phase.settingProfile
+                        ? 'Setting Profile'
+                        : 'Profile Complete',
+                    state: _stepStateFor(
+                      loadingPhase: _Phase.settingProfile,
+                      doneAfter: _Phase.profileDone,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 32),
-                // Dots loading indicator
-                _DotsLoader(),
-              ],
+                  const SizedBox(height: 20),
+                  _buildStep(
+                    label: 'Setting Up Your Dashboard',
+                    state: _stepStateFor(
+                      loadingPhase: _Phase.settingDashboard,
+                      doneAfter: _Phase.allDone,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Returns the correct StepState based on current phase
+  _StepState _stepStateFor({
+    required _Phase loadingPhase,
+    required _Phase doneAfter,
+  }) {
+    if (_phase.index >= doneAfter.index) return _StepState.done;
+    if (_phase == loadingPhase) return _StepState.loading;
+    return _StepState.inactive;
+  }
+
+  Widget _buildTitle() {
+    final isDone = _phase == _Phase.allDone;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 500),
+      transitionBuilder: (child, anim) =>
+          FadeTransition(opacity: anim, child: child),
+      child: Text(
+        isDone
+            ? 'Your personalized\ndashboard is ready!'
+            : 'We are building your\ndashboard${'.' * _dotCount}',
+        key: ValueKey(isDone),
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: AppColors.white,
+          fontSize: 28,
+          fontWeight: FontWeight.w700,
+          height: 1.3,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubtitle(String firstName) {
+    final String text;
+    if (_phase == _Phase.allDone) {
+      text = 'All set!';
+    } else if (_phase == _Phase.settingDashboard) {
+      text = 'You\'re nearly there...';
+    } else {
+      text = firstName.isNotEmpty
+          ? 'It will only take a moment, $firstName.'
+          : 'It will only take a moment.';
+    }
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      transitionBuilder: (child, anim) =>
+          FadeTransition(opacity: anim, child: child),
+      child: Text(
+        text,
+        key: ValueKey(text),
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: AppColors.white.withValues(alpha: 0.65),
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          height: 1.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep({
+    required String label,
+    required _StepState state,
+  }) {
+    final isInactive = state == _StepState.inactive;
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 400),
+      opacity: isInactive ? 0.35 : 1.0,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildStepIcon(state),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: TextStyle(
+              color: isInactive
+                  ? AppColors.white.withValues(alpha: 0.5)
+                  : AppColors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepIcon(_StepState state) {
+    if (state == _StepState.loading) {
+      return const SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(
+          strokeWidth: 2.5,
+          color: AppColors.white,
+        ),
+      );
+    }
+
+    if (state == _StepState.done) {
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: 24,
+        height: 24,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.white,
+        ),
+        child: const Icon(
+          Icons.check_rounded,
+          size: 14,
+          color: Color(0xFF033839),
+        ),
+      );
+    }
+
+    // Inactive — empty circle
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: AppColors.white.withValues(alpha: 0.4),
+          width: 1.5,
+        ),
       ),
     );
   }
@@ -72,11 +253,7 @@ class _LoadingScreenState extends State<LoadingScreen>
           left: -40,
           child: Opacity(
             opacity: 0.08,
-            child: Image.asset(
-              'assets/images/image.png',
-              width: 200,
-              height: 200,
-            ),
+            child: Image.asset('assets/images/image.png', width: 200),
           ),
         ),
         Positioned(
@@ -84,67 +261,10 @@ class _LoadingScreenState extends State<LoadingScreen>
           right: -60,
           child: Opacity(
             opacity: 0.08,
-            child: Image.asset(
-              'assets/images/image.png',
-              width: 240,
-              height: 240,
-            ),
+            child: Image.asset('assets/images/image.png', width: 240),
           ),
         ),
       ],
-    );
-  }
-}
-
-class _DotsLoader extends StatefulWidget {
-  @override
-  State<_DotsLoader> createState() => _DotsLoaderState();
-}
-
-class _DotsLoaderState extends State<_DotsLoader>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (_, __) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(3, (i) {
-            final delay = i / 3;
-            final t = ((_controller.value - delay + 1) % 1);
-            final opacity = t < 0.5
-                ? (t * 2).clamp(0.3, 1.0)
-                : ((1 - t) * 2).clamp(0.3, 1.0);
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.white.withValues(alpha: opacity),
-              ),
-            );
-          }),
-        );
-      },
     );
   }
 }

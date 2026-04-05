@@ -35,18 +35,26 @@ class AuthProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    // Simulate network call — replace with real API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // Simulate network call — replace with real API call
+      await Future.delayed(const Duration(seconds: 2));
 
-    if (_pendingEmail.isNotEmpty && password.isNotEmpty) {
-      await _storageService.saveCredentials(
-        email: _pendingEmail,
-        password: password,
-      );
-      _status = AuthStatus.authenticated;
-      notifyListeners();
-      return true;
-    } else {
+      if (_pendingEmail.isNotEmpty && password.isNotEmpty) {
+        // Save in background — don't let storage failure block navigation
+        _storageService.saveCredentials(
+          email: _pendingEmail,
+          password: password,
+        ).catchError((_) {});
+        _status = AuthStatus.authenticated;
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = 'Something went wrong. Please try again.';
+        _status = AuthStatus.error;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
       _errorMessage = 'Something went wrong. Please try again.';
       _status = AuthStatus.error;
       notifyListeners();

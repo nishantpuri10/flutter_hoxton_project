@@ -33,18 +33,23 @@ class _PasswordScreenState extends State<PasswordScreen> {
   Future<void> _onSetPassword() async {
     if (!_allMet) return;
     final auth = context.read<AuthProvider>();
-    final success = await auth.completeLogin(password: _password);
-    if (!mounted) return;
-    if (success) {
-      Navigator.of(context).pushAndRemoveUntil(
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const LoadingScreen(),
-          transitionsBuilder: (_, anim, __, child) =>
-              FadeTransition(opacity: anim, child: child),
-          transitionDuration: const Duration(milliseconds: 400),
-        ),
-        (route) => false,
-      );
+    try {
+      final success = await auth.completeLogin(password: _password);
+      if (!mounted) return;
+      if (success) {
+        Navigator.of(context).pushAndRemoveUntil(
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => const LoadingScreen(),
+            transitionsBuilder: (_, anim, __, child) =>
+                FadeTransition(opacity: anim, child: child),
+            transitionDuration: const Duration(milliseconds: 400),
+          ),
+          (route) => false,
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      auth.resetStatus();
     }
   }
 
